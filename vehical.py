@@ -18,14 +18,14 @@ CHANNEL_USERNAME = "@Click2Hackk"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
-# --- HTTP सर्वर (Render के लिए पोर्ट) - अब बेहतर रिस्पॉन्स देगा ---
+# --- HTTP सर्वर (Render के लिए पोर्ट) ---
 class HealthCheck(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
-        self.wfile.write(b"""
+        html_content = """
         <!DOCTYPE html>
         <html>
         <head><title>C2H Vehicle Bot</title></head>
@@ -36,10 +36,10 @@ class HealthCheck(BaseHTTPRequestHandler):
         <p>Uptime: 24/7 Active</p>
         </body>
         </html>
-        """)
+        """
+        self.wfile.write(html_content.encode())
     
     def log_message(self, format, *args):
-        # लॉग कम करने के लिए
         return
 
 def run_http_server():
