@@ -74,7 +74,7 @@ def send_welcome(message):
         "╚═══════════════════════════╝\n\n"
         "✅ स्वागत है!\n\n"
         "📱 SEND YOUR VEHICLE NUMBER\n"
-        "Example: UP70GB3954"
+        "Example: UP70GD5514"
     )
     bot.reply_to(message, welcome_text)
 
