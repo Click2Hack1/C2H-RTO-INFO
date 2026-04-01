@@ -18,12 +18,29 @@ CHANNEL_USERNAME = "@Click2Hackk"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
-# --- HTTP सर्वर (Render के लिए पोर्ट) ---
+# --- HTTP सर्वर (Render के लिए पोर्ट) - अब बेहतर रिस्पॉन्स देगा ---
 class HealthCheck(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
-        self.wfile.write(b"Bot is running")
+        self.wfile.write(b"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>C2H Vehicle Bot</title></head>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+        <h1>🔥 C2H Vehicle Info Bot 🔥</h1>
+        <p>Status: <b style="color: green;">RUNNING</b></p>
+        <p>Powered by Click 2 Hack</p>
+        <p>Uptime: 24/7 Active</p>
+        </body>
+        </html>
+        """)
+    
+    def log_message(self, format, *args):
+        # लॉग कम करने के लिए
+        return
 
 def run_http_server():
     port = int(os.environ.get("PORT", 10000))
@@ -85,7 +102,7 @@ def send_welcome(message):
         "    🚗 𝗩𝗘𝗛𝗜𝗖𝗟𝗘 𝗜𝗡𝗙𝗢 𝗕𝗢𝗧 🚗         \n"
         "╚═══════════════════════════╝\n\n"
         "<b>SEND YOUR VEHICLE NUMBER</b>\n"
-        "<i>Example: UP32AU5344</i>"
+        "<i>Example: UP70GB3954</i>"
     )
     bot.reply_to(message, welcome_text)
 
@@ -179,8 +196,10 @@ if __name__ == "__main__":
     print("🚀 Click 2 Hack Vehicle Info Bot शुरू हो रहा है...")
     print("✅ Powered by Click 2 Hack vehicle osint")
     print(f"✅ Channel Check: {CHANNEL_USERNAME}")
+    print(f"✅ HTTP Server running on port: {os.environ.get('PORT', 10000)}")
+    print("✅ Bot will stay alive 24/7")
     try:
         bot.infinity_polling()
     except Exception as e:
         print(f"❌ बॉट बंद हो गया: {e}")
-    print("🛑 बॉट बंद हो गया है。")
+    print("🛑 बॉट बंद हो गया है।")
