@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: c2h-vehicle-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        value: "8721553020:AAGUkfdqJsWcHj3yO0u4PPufNj3_b33C_Pc"
