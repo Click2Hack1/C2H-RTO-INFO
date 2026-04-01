@@ -1,118 +1,208 @@
 #!/usr/bin/env python3
-# C2H Vehicle Info Bot - v7 (Cron-Job Fix)
+# C2H Vehicle Info Bot - Flask Version
 # Powered by Click 2 Hack vehicle osint
 
 import telebot
 import requests
 import json
-import time
-from urllib.parse import urlencode
-# --- वेब सर्विस के लिए ज़रूरी चीजें ---
 import os
-from flask import Flask, Response  # Response को यहाँ इम्पोर्ट करें
-from threading import Thread
-# ------------------------------------
+import time
+import threading
+from flask import Flask
+from urllib.parse import urlencode
+from datetime import datetime
 
 # --- बॉट और API की जानकारी ---
 BOT_TOKEN = "8721553020:AAGUkfdqJsWcHj3yO0u4PPufNj3_b33C_Pc"
 API_BASE = "https://vehicleinfobyterabaap.vercel.app/lookup"
-CHANNEL_USERNAME = "@Click2Hackk"
+CHANNELS = ["@Click2Hackk"]
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
-
-# --- वेब सर्विस को जिंदा रखने के लिए सर्वर ---
 app = Flask(__name__)
 
-@app.route('/')
-def index():
-    # --- यहाँ बदलाव किया गया है ---
-    # अब यह कोई टेक्स्ट नहीं भेजेगा, सिर्फ एक खाली 'OK' (200) रिस्पॉन्स देगा।
-    return Response(status=200)
+bot_running = True
+last_activity = datetime.now()
 
-def run_web_server():
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
-# -------------------------------------------
+# --- चैनल जॉइन चेक (Number Info वाले जैसा) ---
+def is_joined(user_id):
+    for ch in CHANNELS:
+        try:
+            member = bot.get_chat_member(ch, user_id)
+            if member.status in ["left", "kicked"]:
+                return False
+        except Exception as e:
+            print(f"Error checking channel {ch}: {e}")
+            return False
+    return True
 
-# --- बाकी का पूरा कोड बिल्कुल वैसा ही रहेगा जैसा पहले था ---
-
-# --- चैनल जॉइन चेक करने का फंक्शन ---
-def is_user_joined_channel(user_id):
-    try:
-        member = bot.get_chat_member(CHANNEL_USERNAME, user_id)
-        return member.status in ['member', 'administrator', 'creator']
-    except:
-        return False
-
-# --- मुख्य लॉजिक ---
+# --- API से डेटा लेना ---
 def fetch_vehicle_data(rc):
     params = {"rc": rc}
     url = f"{API_BASE}?{urlencode(params)}"
     try:
-        resp = requests.get(url, timeout=15, headers={"User-Agent": "FirewallBreaker/PRO (by thakur2309)"})
+        resp = requests.get(
+            url,
+            timeout=15,
+            headers={"User-Agent": "FirewallBreaker/PRO (by thakur2309)"},
+        )
         resp.raise_for_status()
         data = resp.json()
-        return (data, None) if "error" not in data else (None, data.get("error", "API से अज्ञात त्रुटि।"))
-    except requests.exceptions.RequestException as e:
-        return None, f"API से कनेक्ट करने में त्रुटि: {e}"
-    except json.JSONDecodeError:
-        return None, "API से अमान्य प्रतिक्रिया मिली।"
+        if "error" in data:
+            return None, data.get("error")
+        return data, None
+    except Exception as e:
+        return None, str(e)
 
-# --- टेलीग्राम बॉट के कमांड हैंडलर ---
+# --- कमांड हैंडलर (Number Info वाले जैसा) ---
 @bot.message_handler(commands=['start', 'hello'])
 def send_welcome(message):
+    global last_activity
+    last_activity = datetime.now()
     user_id = message.from_user.id
-    if not is_user_joined_channel(user_id):
-        bot.reply_to(message, f"<b>⚠️ आपने हमारा चैनल जॉइन नहीं किया है!</b>\n\nकृपया पहले हमारा चैनल जॉइन करें:\n👉 {CHANNEL_USERNAME}\n\n<b>चैनल जॉइन करने के बाद /start कमांड दोबारा भेजें।</b>")
-        return
-    bot.reply_to(message, "╔═══════════════════════════╗\n     🔥 𝗖𝗟𝗜𝗖𝗞 𝟮 𝗛𝗔𝗖𝗞 🔥              \n    🚗 𝗩𝗘𝗛𝗜𝗖𝗟𝗘 𝗜𝗡𝗙𝗢 𝗕𝗢𝗧 🚗         \n╚═══════════════════════════╝\n\n<b>SEND YOUR VEHICLE NUMBER</b>\n<i>Example: UP70GB3954</i>")
+    
+    if not is_joined(user_id):
+        text = "🚫 कृपया पहले हमारा चैनल जॉइन करें:\n\n"
+        for ch in CHANNELS:
+            text += f"👉 https://t.me/{ch.replace('@','')}\n"
+        text += "\n✅ जॉइन करने के बाद /start दोबारा भेजें।"
+        return bot.reply_to(message, text)
+    
+    welcome_text = (
+        "╔═══════════════════════════╗\n"
+        "     🔥 𝗖𝗟𝗜𝗖𝗞 𝟮 𝗛𝗔𝗖𝗞 🔥              \n"
+        "    🚗 𝗩𝗘𝗛𝗜𝗖𝗟𝗘 𝗜𝗡𝗙𝗢 𝗕𝗢𝗧 🚗         \n"
+        "╚═══════════════════════════╝\n\n"
+        "✅ स्वागत है!\n\n"
+        "📱 SEND YOUR VEHICLE NUMBER\n"
+        "Example: UP70GB3954"
+    )
+    bot.reply_to(message, welcome_text)
 
 @bot.message_handler(func=lambda message: True)
 def handle_vehicle_number(message):
+    global last_activity
+    last_activity = datetime.now()
     user_id = message.from_user.id
-    if not is_user_joined_channel(user_id):
-        bot.reply_to(message, f"<b>⚠️ आपने हमारा चैनल जॉइन नहीं किया है!</b>\n\nकृपया पहले हमारा चैनल जॉइन करें:\n👉 {CHANNEL_USERNAME}\n\n<b>चैनल जॉइन करने के बाद /start कमांड दोबारा भेजें।</b>")
-        return
+    
+    if not is_joined(user_id):
+        text = "🚫 पहले चैनल जॉइन करें! /start भेजें"
+        return bot.reply_to(message, text)
     
     vehicle_number = message.text.strip().upper()
-    processing_msg = bot.reply_to(message, "<code>⏳ Processing... Please wait ⏳</code>")
-    time.sleep(2)
-
+    
+    bot.send_chat_action(message.chat.id, 'typing')
+    
     info, error = fetch_vehicle_data(vehicle_number)
 
     if error:
-        bot.edit_message_text(f"<b>❌ ERROR ❌</b>\n\n<pre>{error}</pre>", chat_id=processing_msg.chat.id, message_id=processing_msg.message_id)
+        bot.reply_to(message, f"❌ ERROR: {error}")
         return
 
     if info:
-        header = "╔═══════════════════════════╗\n   🔥 𝗖𝗟𝗜𝗖𝗞 𝟮 𝗛𝗔𝗖𝗞 🔥              \n   🚗 𝗩𝗘𝗛𝗜𝗖𝗟𝗘 𝗜𝗡𝗙𝗢 𝗕𝗢𝗧 🚗        \n╚═══════════════════════════╝\n\n"
-        details_text = ""
-        field_order = ["ownerName", "registrationNumber", "vehicleClass", "chassisNumber", "engineNumber", "fuelType", "manufacturerModel", "manufacturerYear", "insuranceValidity", "fitnessValidity", "taxValidity", "pucValidity", "state", "district", "city", "status"]
+        header = (
+            "🔥 *ᴄʟɪᴄᴋ 𝟸 ʜᴀᴄᴋ* 🔥\n"
+            "╔════════════════════╗\n"
+            "     🚗 *ᴠᴇʜɪᴄʟᴇ ɪɴғᴏ* 🚗\n"
+            "╚════════════════════╝\n\n"
+        )
         
-        for field in field_order:
+        details_text = "📋 *वाहन डिटेल्स* \n━━━━━━━━━━━━━━━━━━\n"
+        
+        field_order = [
+            ("ownerName", "👤 मालिक का नाम"),
+            ("registrationNumber", "🔢 रजिस्ट्रेशन नंबर"),
+            ("vehicleClass", "🚗 वाहन का प्रकार"),
+            ("chassisNumber", "🔧 चेसिस नंबर"),
+            ("engineNumber", "⚙️ इंजन नंबर"),
+            ("fuelType", "⛽ ईंधन प्रकार"),
+            ("manufacturerModel", "🏭 मॉडल"),
+            ("manufacturerYear", "📅 निर्माण वर्ष"),
+            ("insuranceValidity", "📝 बीमा वैधता"),
+            ("fitnessValidity", "💪 फिटनेस वैधता"),
+            ("taxValidity", "💰 टैक्स वैधता"),
+            ("pucValidity", "🌿 PUC वैधता"),
+            ("state", "📍 राज्य"),
+            ("district", "🏘️ जिला"),
+            ("city", "🌆 शहर"),
+            ("status", "📊 स्थिति")
+        ]
+        
+        for field, display_name in field_order:
             if field in info and info[field] and info[field] != "NA":
-                details_text += f"<b>{field.replace('_', ' ').title()}</b> : {info[field]}\n\n"
+                value_str = str(info[field])
+                details_text += f"{display_name} : {value_str}\n"
         
         for field, value in info.items():
-            if field.lower() != 'copyright' and field not in field_order and value and value != "NA":
-                details_text += f"<b>{field.replace('_', ' ').title()}</b> : {value}\n\n"
+            if field.lower() == 'copyright':
+                continue
+            found = False
+            for f, _ in field_order:
+                if f == field:
+                    found = True
+                    break
+            if not found and value and value != "NA":
+                pretty_field = field.replace("_", " ").title()
+                details_text += f"📌 {pretty_field} : {value}\n"
         
-        details_text += f"<b>Searched Number</b> : {vehicle_number}\n\n"
-        footer = "╔═══════════════════════════╗\n   🔥 𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗕𝘆 𝗖𝗹𝗶𝗰𝗸 𝟮 𝗛𝗮𝗰𝗸 🔥   \n            🔥 @Click2Hackk 🔥      \n╚═══════════════════════════╝"
+        details_text += f"\n🔍 *खोजा गया नंबर* : {vehicle_number}\n"
         
-        bot.edit_message_text(header + details_text + footer, chat_id=processing_msg.chat.id, message_id=processing_msg.message_id)
+        footer = (
+            "\n╔════════════════════╗\n"
+            "   🔥 *@Click2Hackk* 🔥\n"
+            "   👑 *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄʟɪᴄᴋ 𝟸 ʜᴀᴄᴋ* 👑\n"
+            "╚════════════════════╝"
+        )
+        
+        full_message = header + details_text + footer
+        bot.reply_to(message, full_message, parse_mode='Markdown')
     else:
-        bot.edit_message_text("╔════════════════════════════╗\n   ❌ 𝗡𝗢 𝗗𝗔𝗧𝗔 𝗙𝗢𝗨𝗡𝗗 ❌          \n╚═════════════════════════════╝\n\nNo information found for this vehicle number.", chat_id=processing_msg.chat.id, message_id=processing_msg.message_id)
+        bot.reply_to(message, "❌ वाहन नंबर के लिए कोई जानकारी नहीं मिली!")
 
-# --- बॉट को शुरू करें ---
+# --- Flask Routes (Number Info वाले जैसा) ---
+@app.route('/')
+def home():
+    return {
+        "status": "Bot is running in polling mode",
+        "message": "C2H Vehicle Info Bot is active on Telegram",
+        "commands": ["/start", "/hello", "send vehicle number"],
+        "channels": CHANNELS
+    }, 200
+
+@app.route('/health')
+def health():
+    return {"status": "healthy", "bot_running": bot_running}, 200
+
+# --- बॉट पोलिंग थ्रेड (Number Info वाले जैसा) ---
+def run_bot_polling():
+    global bot_running
+    while bot_running:
+        try:
+            print("🔄 Bot polling started...")
+            bot.remove_webhook()
+            bot.polling(none_stop=True, interval=1, timeout=20)
+        except Exception as e:
+            print(f"❌ Polling error: {e}")
+            if bot_running:
+                print("🔄 Restarting in 10 seconds...")
+                time.sleep(10)
+
+# --- बॉट शुरू करें ---
 if __name__ == "__main__":
-    print("🚀 Click 2 Hack Vehicle Info Bot शुरू हो रहा है...")
-    web_thread = Thread(target=run_web_server)
-    web_thread.start()
+    port = int(os.environ.get("PORT", 5000))
     
-    print("✅ Bot polling शुरू हो रहा है...")
-    try:
-        bot.infinity_polling()
-    except Exception as e:
-        print(f"❌ बॉट बंद हो गया: {e}")
-    print("🛑 बॉट बंद हो गया है।")
+    print("="*50)
+    print("🚀 C2H Vehicle Info Bot Starting on Render")
+    print("="*50)
+    print(f"Bot Token: {BOT_TOKEN[:10]}...")
+    print(f"Channels: {CHANNELS}")
+    print(f"Port: {port}")
+    print("="*50)
+    
+    # बॉट पोलिंग बैकग्राउंड थ्रेड में शुरू करो
+    polling_thread = threading.Thread(target=run_bot_polling)
+    polling_thread.daemon = True
+    polling_thread.start()
+    
+    # Flask सर्वर शुरू करो
+    print("🚀 Starting Flask server...")
+    app.run(host="0.0.0.0", port=port)
