@@ -6,16 +6,31 @@ import telebot
 import requests
 import json
 import time
+import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlencode
 
 # --- बॉट और API की जानकारी ---
 BOT_TOKEN = "8721553020:AAGUkfdqJsWcHj3yO0u4PPufNj3_b33C_Pc"
 API_BASE = "https://vehicleinfobyterabaap.vercel.app/lookup"
-CHANNEL_USERNAME = "@Click2Hackk"  # तुम्हारा चैनल का यूजरनेम
+CHANNEL_USERNAME = "@Click2Hackk"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
-# --- चैनल जॉइन चेक करने का फंक्शन ---
+# --- HTTP सर्वर (Render के लिए पोर्ट) ---
+class HealthCheck(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running")
+
+def run_http_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthCheck)
+    server.serve_forever()
+
+# --- चैनल जॉइन चेक ---
 def is_user_joined_channel(user_id):
     try:
         member = bot.get_chat_member(CHANNEL_USERNAME, user_id)
@@ -25,7 +40,7 @@ def is_user_joined_channel(user_id):
     except:
         return False
 
-# --- मुख्य लॉजिक ---
+# --- API से डेटा लेना ---
 def fetch_vehicle_data(rc):
     params = {"rc": rc}
     url = f"{API_BASE}?{urlencode(params)}"
@@ -45,13 +60,11 @@ def fetch_vehicle_data(rc):
     except json.JSONDecodeError:
         return None, "API से अमान्य प्रतिक्रिया मिली।"
 
-# --- टेलीग्राम बॉट के कमांड हैंडलर ---
-
+# --- कमांड हैंडलर ---
 @bot.message_handler(commands=['start', 'hello'])
 def send_welcome(message):
     user_id = message.from_user.id
     
-    # चेक करो कि यूजर चैनल जॉइन है या नहीं
     if not is_user_joined_channel(user_id):
         welcome_text = (
             "╔═══════════════════════════╗\n"
@@ -66,7 +79,6 @@ def send_welcome(message):
         bot.reply_to(message, welcome_text)
         return
     
-    # अगर चैनल जॉइन है तो वेलकम मैसेज दिखाओ
     welcome_text = (
         "╔═══════════════════════════╗\n"
         "     🔥 𝗖𝗟𝗜𝗖𝗞 𝟮 𝗛𝗔𝗖𝗞 🔥              \n"
@@ -81,7 +93,6 @@ def send_welcome(message):
 def handle_vehicle_number(message):
     user_id = message.from_user.id
     
-    # चेक करो कि यूजर चैनल जॉइन है या नहीं
     if not is_user_joined_channel(user_id):
         not_joined_text = (
             "╔═══════════════════════════╗\n"
@@ -109,7 +120,6 @@ def handle_vehicle_number(message):
         return
 
     if info:
-        # हेडर - नंबर इंफो वाले स्टाइल में
         header = (
             "╔═══════════════════════════╗\n"
             "   🔥 𝗖𝗟𝗜𝗖𝗞 𝟮 𝗛𝗔𝗖𝗞 🔥              \n"
@@ -117,10 +127,8 @@ def handle_vehicle_number(message):
             "╚═══════════════════════════╝\n\n"
         )
         
-        # जानकारी - साफ-साफ फॉर्मेट
         details_text = ""
         
-        # फील्ड को ऑर्डर में दिखाने के लिए
         field_order = [
             "ownerName", "registrationNumber", "vehicleClass", "chassisNumber",
             "engineNumber", "fuelType", "manufacturerModel", "manufacturerYear",
@@ -128,14 +136,12 @@ def handle_vehicle_number(message):
             "state", "district", "city", "status"
         ]
         
-        # पहले ऑर्डर वाले फील्ड दिखाएं
         for field in field_order:
             if field in info and info[field] and info[field] != "NA":
                 pretty_field = field.replace("_", " ").title()
                 value_str = str(info[field])
                 details_text += f"<b>{pretty_field}</b> : {value_str}\n\n"
         
-        # बाकी बचे हुए फील्ड दिखाएं
         for field, value in info.items():
             if field.lower() == 'copyright':
                 continue
@@ -144,10 +150,8 @@ def handle_vehicle_number(message):
                 value_str = str(value)
                 details_text += f"<b>{pretty_field}</b> : {value_str}\n\n"
         
-        # सर्च किया गया नंबर
         details_text += f"<b>Searched Number</b> : {vehicle_number}\n\n"
         
-        # फुटर - बिल्कुल नंबर इंफो वाले स्टाइल में
         footer = (
             "╔═══════════════════════════╗\n"
             "   🔥 𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗕𝘆 𝗖𝗹𝗶𝗰𝗸 𝟮 𝗛𝗮𝗰𝗸 🔥   \n"
@@ -169,6 +173,9 @@ def handle_vehicle_number(message):
 
 # --- बॉट को शुरू करें ---
 if __name__ == "__main__":
+    # HTTP सर्वर अलग थ्रेड में चलाओ
+    threading.Thread(target=run_http_server, daemon=True).start()
+    
     print("🚀 Click 2 Hack Vehicle Info Bot शुरू हो रहा है...")
     print("✅ Powered by Click 2 Hack vehicle osint")
     print(f"✅ Channel Check: {CHANNEL_USERNAME}")
@@ -176,4 +183,4 @@ if __name__ == "__main__":
         bot.infinity_polling()
     except Exception as e:
         print(f"❌ बॉट बंद हो गया: {e}")
-    print("🛑 बॉट बंद हो गया है।")
+    print("🛑 बॉट बंद हो गया है。")
