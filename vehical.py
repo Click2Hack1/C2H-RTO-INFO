@@ -85,7 +85,7 @@ def send_welcome(message):
         "    🚗 𝗩𝗘𝗛𝗜𝗖𝗟𝗘 𝗜𝗡𝗙𝗢 𝗕𝗢𝗧 🚗         \n"
         "╚═══════════════════════════╝\n\n"
         "<b>SEND YOUR VEHICLE NUMBER</b>\n"
-        "<i>Example: UP70GB3954</i>"
+        "<i>Example: UP32AU5344</i>"
     )
     bot.reply_to(message, welcome_text)
 
