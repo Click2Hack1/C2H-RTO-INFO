@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 from datetime import datetime
 
 # --- बॉट और API की जानकारी ---
-BOT_TOKEN = "8721553020:AAGUkfdqJsWcHj3yO0u4PPufNj3_b33C_Pc"
+BOT_TOKEN = "8692231051:AAGwosn7l4LcFauTlM63OTrMhC8HojgmUtE"
 API_BASE = "https://vehicleinfobyterabaap.vercel.app/lookup"
 CHANNELS = ["@Click2Hackk"]
 
